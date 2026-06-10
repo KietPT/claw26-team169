@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <title>Máy Tính Cho Bé 🧮</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="header">
+        <div class="mascot" aria-hidden="true">🧮</div>
+        <h1>Máy Tính Cho Bé</h1>
+        <p>Học toán vui vẻ từng ngày!</p>
+      </header>
+
+      <section class="card">
+        <div id="display" class="display" aria-live="polite">0</div>
+      </section>
+
+      <section class="card">
+        <div id="chat" class="chat" aria-live="polite"></div>
+      </section>
+
+      <section class="card">
+        <div class="actions">
+          <button type="button" class="btn btn-quiz" id="btn-quiz-easy">🎯 Quiz dễ</button>
+          <button type="button" class="btn btn-quiz" id="btn-quiz-hard">🏆 Quiz khó</button>
+          <button type="button" class="btn btn-action" id="btn-explain">💡 Giải thích</button>
+          <button type="button" class="btn btn-op" id="btn-help">❓ Trợ giúp</button>
+        </div>
+
+        <div class="keypad">
+          <button type="button" class="btn btn-action" data-key="C">C</button>
+          <button type="button" class="btn btn-op" data-key="⌫">⌫</button>
+          <button type="button" class="btn btn-op" data-key="÷">÷</button>
+          <button type="button" class="btn btn-op" data-key="×">×</button>
+
+          <button type="button" class="btn btn-num" data-key="7">7</button>
+          <button type="button" class="btn btn-num" data-key="8">8</button>
+          <button type="button" class="btn btn-num" data-key="9">9</button>
+          <button type="button" class="btn btn-op" data-key="-">−</button>
+
+          <button type="button" class="btn btn-num" data-key="4">4</button>
+          <button type="button" class="btn btn-num" data-key="5">5</button>
+          <button type="button" class="btn btn-num" data-key="6">6</button>
+          <button type="button" class="btn btn-op" data-key="+">+</button>
+
+          <button type="button" class="btn btn-num" data-key="1">1</button>
+          <button type="button" class="btn btn-num" data-key="2">2</button>
+          <button type="button" class="btn btn-num" data-key="3">3</button>
+          <button type="button" class="btn btn-primary btn-wide" data-key="=">= Tính</button>
+
+          <button type="button" class="btn btn-num btn-wide" data-key="0">0</button>
+        </div>
+      </section>
+
+      <p class="footer">Bấm số → bấm phép → bấm "= Tính" nhé!</p>
+    </div>
+    <script src="/static/js/app.js"></script>
+  </body>
+</html>
