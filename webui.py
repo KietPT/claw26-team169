@@ -29,6 +29,12 @@ from digest.snapshot import StateStore
 from scheduler import AgentScheduler, DigestService
 
 app = FastAPI(title="Dev Daily Digest")
+
+# Health endpoint for AgentBase Runtime
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
 ENV_PATH = os.environ.get("ENV_FILE", ".env")
 _scheduler: AgentScheduler | None = None   # one live scheduler per process
 
