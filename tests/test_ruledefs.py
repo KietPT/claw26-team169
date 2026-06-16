@@ -37,6 +37,6 @@ def test_redact_all_pii_types(tmp_path):
 def test_missing_file_falls_back_to_defaults(tmp_path):
     rs = ruledefs.load_ruleset(str(tmp_path / "nope.yaml"))
     assert rs.skip_statuses == frozenset()    # default skips nothing
-    assert "ISSUE" in rs.cs_projects          # default CS project
-    assert rs.sandbox_alert_days == 2             # default alert threshold
+    assert "IS" in rs.cs_projects             # default CS project
+    assert rs.duedate_alert_days == 2             # default alert threshold
     assert rs.pii                             # has PII patterns

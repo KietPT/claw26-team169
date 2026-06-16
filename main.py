@@ -23,8 +23,9 @@ def _make_service(make_delivery) -> DigestService:
     return DigestService(llm=_llm(), model=CFG.llm_model,
         gitlab_base=CFG.gitlab_base_url, jira_base=CFG.jira_base_url, report_dir=CFG.report_dir,
         make_gitlab=lambda url, tok: GitLabAdapter(url, tok, window_days=CFG.fetch_window_days),
-        make_jira=lambda url, tok: JiraAdapter(url, tok, window_days=CFG.fetch_window_days),
-        make_delivery=make_delivery, stale_after=CFG.stale_after_days)
+        make_jira=lambda url, tok, email: JiraAdapter(url, tok, email=email, window_days=CFG.fetch_window_days),
+        make_delivery=make_delivery, stale_after=CFG.stale_after_days,
+        gitlab_enabled=CFG.gitlab_enabled)
 
 
 def _delivery_for(owner: Owner, bot, *, open_browser: bool):

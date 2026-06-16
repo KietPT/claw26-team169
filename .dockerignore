@@ -1,0 +1,33 @@
+# Secrets — must NEVER be baked into the image. Inject at runtime via --env-file instead.
+.env
+.env.*
+!.env.example
+.greennode.json
+*.credentials.json
+*registry*credentials*.json
+
+# VCS / agent tooling
+.git
+.gitignore
+.cursor
+.claude
+.agentbase
+
+# Python build / cache
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local-only / generated artifacts (not needed in the running container)
+reports/
+tests/
+docs/
+*.md
+.DS_Store
+kids-calculator/
+.agentbase/

@@ -28,14 +28,39 @@ async def test_overdue_and_inprogress():
     assert by_key["jira:PROJ-1"] == SignalType.JIRA_OVERDUE
     assert by_key["jira:PROJ-2"] == SignalType.JIRA_IN_PROGRESS
 
+async def test_cloud_uses_enhanced_jql_endpoint():
+    """Jira Cloud removed GET /rest/api/2/search (410 Gone, CHANGE-2046).
+    Cloud (*.atlassian.net) must hit the enhanced /rest/api/2/search/jql endpoint."""
+    seen = []
+    adapter = JiraAdapter("https://acme.atlassian.net", "tok", email="me@x.com",
+                          transport=_split(cs=[], sprint=[], seen=seen))
+    await adapter.fetch_items(today=date(2026, 6, 15))
+    assert seen, "expected at least one Jira request"
+    paths = [u.split("?")[0] for u in seen]
+    assert all(p.endswith("/rest/api/2/search/jql") for p in paths), paths
+
+
+async def test_server_dc_keeps_classic_search_endpoint():
+    """Server/DC has no enhanced endpoint — the classic /rest/api/2/search still works there."""
+    seen = []
+    adapter = JiraAdapter("https://jira.internal.example", "tok",
+                          transport=_split(cs=[], sprint=[], seen=seen))
+    await adapter.fetch_items(today=date(2026, 6, 15))
+    assert seen, "expected at least one Jira request"
+    paths = [u.split("?")[0] for u in seen]
+    assert all(p.endswith("/rest/api/2/search") for p in paths), paths
+
+
 def test_task_jql_is_sprint_scoped_cs_is_not():
     adapter = JiraAdapter("https://j", "tok", transport=_split())
     cs_jql, task_jql = adapter._jqls()
-    assert "project in (ISSUE)" in cs_jql and "openSprints" not in cs_jql
-    assert "openSprints()" in task_jql and "project not in (ISSUE)" in task_jql
+    # Project keys MUST be quoted: 'IS' is a JQL reserved word (IS EMPTY / IS NULL),
+    # so an unquoted `project in (IS)` is a 400 JQL syntax error on Jira.
+    assert 'project in ("IS")' in cs_jql and "openSprints" not in cs_jql
+    assert "openSprints()" in task_jql and 'project not in ("IS")' in task_jql
 
 
-_CS = {"key": "ISSUE-1234", "fields": {"summary": "CS", "duedate": None,
+_CS = {"key": "IS-1234", "fields": {"summary": "CS", "duedate": None,
     "status": {"name": "In Progress", "statusCategory": {"key": "indeterminate"}},
     "description": "KH 0901234567 email kh@x.com CCCD 012345678901 cần hỗ trợ"}}
 _TASKS = [
@@ -55,7 +80,7 @@ async def test_new_status_now_shown():
     proj9 = next(i for i in items if i.id == "jira:PROJ-9")   # NEW (xa due) vẫn hiển thị
     assert proj9.signal == SignalType.JIRA_OTHER             # FYI, không alert
 
-async def test_new_due_soon_alerts():
+async def test_due_soon_alerts():
     near = {"key": "DEV-5", "fields": {"summary": "Chưa làm", "duedate": "2026-06-17",
         "status": {"name": "New", "statusCategory": {"key": "new"}}}}   # còn 2 ngày
     far = {"key": "DEV-6", "fields": {"summary": "Còn xa", "duedate": "2026-06-30",
@@ -63,12 +88,22 @@ async def test_new_due_soon_alerts():
     adapter = JiraAdapter("https://j", "tok", transport=_split(sprint=[near, far]))
     items = await adapter.fetch_items(today=date(2026, 6, 15))
     by_key = {i.id: i.signal for i in items}
-    assert by_key["jira:DEV-5"] == SignalType.JIRA_NEW_DUE_SOON   # ≤2 ngày → alert
+    assert by_key["jira:DEV-5"] == SignalType.JIRA_DUE_SOON       # ≤2 ngày → alert
     assert by_key["jira:DEV-6"] == SignalType.JIRA_OTHER          # >2 ngày → FYI
+
+
+async def test_due_soon_applies_to_non_new_tickets():
+    """Pure duedate: ANY non-CS ticket within duedate_alert_days alerts, not just NEW ones.
+    An In Progress ticket due in 2 days → JIRA_DUE_SOON (was JIRA_IN_PROGRESS before)."""
+    doing = {"key": "DEV-8", "fields": {"summary": "Đang làm, sắp hạn", "duedate": "2026-06-17",
+        "status": {"name": "In Progress", "statusCategory": {"key": "indeterminate"}}}}
+    adapter = JiraAdapter("https://j", "tok", transport=_split(sprint=[doing]))
+    items = await adapter.fetch_items(today=date(2026, 6, 15))
+    assert next(i for i in items if i.id == "jira:DEV-8").signal == SignalType.JIRA_DUE_SOON
 
 async def test_cs_ticket_pinned_and_pii_redacted():
     items = await _rules_adapter().fetch_items(today=date(2026, 6, 15))
-    cs = next(i for i in items if i.id == "jira:ISSUE-1234")
+    cs = next(i for i in items if i.id == "jira:IS-1234")
     assert cs.pinned is True
     assert "0901234567" not in cs.detail and "[PHONE]" in cs.detail
     assert "kh@x.com" not in cs.detail and "[EMAIL]" in cs.detail
@@ -119,39 +154,38 @@ async def test_task_type_still_shown():
 
 
 def _rs(**kwargs) -> RuleSet:
-    """Build a minimal RuleSet with overrides for testing custom date fields."""
+    """Build a minimal RuleSet with overrides for testing duedate-based rules."""
     base = dict(skip_statuses=frozenset(), cs_projects=frozenset(["ISSUE"]),
-                comment_limit=3, sandbox_alert_days=2, sla_alert_days=1,
-                sandbox_date_field="", sla_date_field="")
+                comment_limit=3, duedate_alert_days=2, sla_alert_days=1,
+                sla_date_field="")
     base.update(kwargs)
     return RuleSet(**base)
 
 
-async def test_non_cs_uses_sandbox_date():
-    """sandbox_date_field overrides duedate for non-CS due sorting and overdue signal."""
-    near = {"key": "DEV-10", "fields": {
-        "summary": "Task near sandbox", "duedate": "2026-12-31",
-        "customfield_10001": "2026-06-14",   # yesterday → overdue via sandbox date
+async def test_non_cs_overdue_uses_duedate():
+    """Non-CS overdue signal is driven by the plain duedate field."""
+    od = {"key": "DEV-10", "fields": {
+        "summary": "Quá hạn", "duedate": "2026-06-14",   # yesterday → overdue
         "status": {"name": "In Progress", "statusCategory": {"key": "indeterminate"}}}}
-    adapter = JiraAdapter("https://j", "tok", transport=_split(sprint=[near]))
-    adapter._rules = _rs(sandbox_date_field="customfield_10001")
+    adapter = JiraAdapter("https://j", "tok", transport=_split(sprint=[od]))
     items = await adapter.fetch_items(today=date(2026, 6, 15))
     it = next(i for i in items if i.id == "jira:DEV-10")
-    assert it.signal == SignalType.JIRA_OVERDUE        # sandbox date overdue, not duedate
-    assert it.due == date(2026, 6, 14)                 # sorted by sandbox date
+    assert it.signal == SignalType.JIRA_OVERDUE
+    assert it.due == date(2026, 6, 14)
 
 
-async def test_non_cs_sandbox_date_alert():
-    """NEW ticket with sandbox date within sandbox_alert_days triggers JIRA_NEW_DUE_SOON."""
-    near = {"key": "DEV-11", "fields": {
-        "summary": "Chưa bắt đầu", "duedate": "2026-12-31",
-        "customfield_10001": "2026-06-17",   # 2 days away
-        "status": {"name": "New", "statusCategory": {"key": "new"}}}}
-    adapter = JiraAdapter("https://j", "tok", transport=_split(sprint=[near]))
-    adapter._rules = _rs(sandbox_date_field="customfield_10001", sandbox_alert_days=2)
+async def test_non_cs_due_soon_threshold():
+    """duedate_alert_days bounds the due-soon alert: within → JIRA_DUE_SOON, beyond → not."""
+    near = {"key": "DEV-11", "fields": {"summary": "Sắp hạn", "duedate": "2026-06-17",  # 2 days
+        "status": {"name": "In Progress", "statusCategory": {"key": "indeterminate"}}}}
+    far = {"key": "DEV-12", "fields": {"summary": "Còn xa", "duedate": "2026-06-30",    # 15 days
+        "status": {"name": "In Progress", "statusCategory": {"key": "indeterminate"}}}}
+    adapter = JiraAdapter("https://j", "tok", transport=_split(sprint=[near, far]))
+    adapter._rules = _rs(duedate_alert_days=2)
     items = await adapter.fetch_items(today=date(2026, 6, 15))
-    it = next(i for i in items if i.id == "jira:DEV-11")
-    assert it.signal == SignalType.JIRA_NEW_DUE_SOON
+    by_key = {i.id: i.signal for i in items}
+    assert by_key["jira:DEV-11"] == SignalType.JIRA_DUE_SOON       # ≤2 ngày → alert
+    assert by_key["jira:DEV-12"] == SignalType.JIRA_IN_PROGRESS    # >2 ngày → đang làm
 
 
 async def test_cs_sla_alert_within_1_day():

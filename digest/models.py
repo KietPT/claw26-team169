@@ -11,7 +11,7 @@ class SignalType(str, Enum):
     MR_MINE_APPROVED = "mr_mine_approved"
     ISSUE_ASSIGNED_DUE = "issue_assigned_due"
     JIRA_OVERDUE = "jira_overdue"
-    JIRA_NEW_DUE_SOON = "jira_new_due_soon"   # status NEW but due soon → alert
+    JIRA_DUE_SOON = "jira_due_soon"   # non-CS ticket within duedate_alert_days → alert
     JIRA_CS_SLA_DUE_SOON = "jira_cs_sla_due_soon"  # CS ticket: SLA Date within alert threshold
     JIRA_IN_PROGRESS = "jira_in_progress"
     JIRA_OTHER = "jira_other"

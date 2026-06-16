@@ -9,7 +9,8 @@ client = TestClient(webui.app)
 def test_index_widgets_and_no_llm_fields():
     r = client.get("/")
     assert r.status_code == 200
-    assert 'name="gitlab_token"' in r.text
+    assert 'name="jira_token"' in r.text
+    assert 'name="gitlab_token"' not in r.text                         # GitLab hidden (private-network only)
     assert '<select name="delivery_channel"' in r.text                 # delivery = dropdown
     assert 'type="checkbox" name="digest_days" value="fri"' in r.text  # days = checkboxes
     assert "MR/ticket không cập nhật" in r.text                        # stale note shown
@@ -24,33 +25,36 @@ def test_parse_days():
 
 
 def test_merge_overrides_only_nonempty():
-    eff = webui._merge({"gitlab_base_url": "https://my.git", "gitlab_token": "",
+    eff = webui._merge({"jira_base_url": "https://my.jira", "jira_token": "",
                         "stale_after_days": "3"})
-    assert eff["gitlab_base_url"] == "https://my.git"
+    assert eff["jira_base_url"] == "https://my.jira"
     assert eff["stale_after_days"] == "3"
-    assert eff["gitlab_token"] == webui._defaults()["gitlab_token"]   # blank doesn't clobber
+    assert eff["jira_token"] == webui._defaults()["jira_token"]   # blank doesn't clobber
 
 
 def test_save_env_writes_fields_and_preserves_llm(tmp_path, monkeypatch):
     monkeypatch.setattr(webui, "_apply_live", lambda v: None)
     monkeypatch.setenv("LLM_MODEL", "gpt-x")
     monkeypatch.setenv("TIMEZONE", "Asia/Ho_Chi_Minh")
+    monkeypatch.setenv("GITLAB_ENABLED", "false")        # hidden from form, must survive a save
+    monkeypatch.setenv("GITLAB_TOKEN", "glpat-keep")
     p = tmp_path / ".env"
-    webui._save_env({"gitlab_base_url": "https://g", "stale_after_days": "5",
+    webui._save_env({"jira_base_url": "https://j", "stale_after_days": "5",
                      "digest_days": "mon,wed"}, str(p))
     text = p.read_text()
-    assert "GITLAB_BASE_URL=https://g" in text and "STALE_AFTER_DAYS=5" in text
+    assert "JIRA_BASE_URL=https://j" in text and "STALE_AFTER_DAYS=5" in text
     assert "DIGEST_DAYS=mon,wed" in text
     assert "LLM_MODEL=gpt-x" in text and "TIMEZONE=Asia/Ho_Chi_Minh" in text  # preserved
+    assert "GITLAB_ENABLED=false" in text and "GITLAB_TOKEN=glpat-keep" in text  # GitLab preserved, not wiped
 
 
 def test_config_route_joins_days(monkeypatch):
     saved = {}
     monkeypatch.setattr(webui, "_save_env", lambda values, *a: saved.update(values))
-    r = client.post("/config", data={"gitlab_base_url": "https://g",
+    r = client.post("/config", data={"jira_base_url": "https://j",
                                      "digest_days": ["mon", "fri"]})
     assert r.status_code == 200
-    assert saved["gitlab_base_url"] == "https://g"
+    assert saved["jira_base_url"] == "https://j"
     assert saved["digest_days"] == "mon,fri"        # checkboxes joined, canonical order
     assert "Đã lưu" in r.text
 

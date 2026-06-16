@@ -7,7 +7,7 @@ CATEGORY_BY_SIGNAL: dict[SignalType, Category] = {
     SignalType.MR_NEEDS_MY_REVIEW: Category.ACTION,
     SignalType.MR_MINE_PIPELINE_FAILED: Category.ACTION,
     SignalType.JIRA_OVERDUE: Category.ACTION,
-    SignalType.JIRA_NEW_DUE_SOON: Category.ACTION,
+    SignalType.JIRA_DUE_SOON: Category.ACTION,
     SignalType.JIRA_CS_SLA_DUE_SOON: Category.ACTION,
     SignalType.ISSUE_ASSIGNED_DUE: Category.ACTION,
     SignalType.MR_MINE_COMMENTED: Category.WAITING,
@@ -20,7 +20,7 @@ CATEGORY_BY_SIGNAL: dict[SignalType, Category] = {
 RISK_SIGNALS = {
     SignalType.JIRA_OVERDUE,
     SignalType.ISSUE_ASSIGNED_DUE,
-    SignalType.JIRA_NEW_DUE_SOON,
+    SignalType.JIRA_DUE_SOON,
     SignalType.JIRA_CS_SLA_DUE_SOON,
 }
 

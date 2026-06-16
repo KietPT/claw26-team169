@@ -13,7 +13,7 @@ created when you click Lưu cấu hình.
 Run:  uvicorn webui:app --host 0.0.0.0 --port 8000
 """
 from __future__ import annotations
-import html as _html, os
+import html as _html, logging, os
 from datetime import datetime, timezone as _tz
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
@@ -28,6 +28,7 @@ from digest.builder import build_digest
 from digest.snapshot import StateStore
 from scheduler import AgentScheduler, DigestService
 
+logger = logging.getLogger(__name__)
 app = FastAPI(title="Dev Daily Digest")
 
 # Health endpoint for AgentBase Runtime
@@ -42,10 +43,11 @@ DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
 # Editable in the form. kind ∈ text|password|select|days|number.
 FORM_FIELDS = [
-    {"name": "gitlab_base_url", "env": "GITLAB_BASE_URL", "label": "GitLab base URL", "kind": "text"},
-    {"name": "gitlab_token", "env": "GITLAB_TOKEN", "label": "GitLab token (cá nhân)", "kind": "password"},
+    # GitLab fields are hidden: GitLab is disabled by default (private-network only).
+    # To re-enable, set GITLAB_ENABLED=true and GITLAB_BASE_URL/GITLAB_TOKEN in the .env directly.
     {"name": "jira_base_url", "env": "JIRA_BASE_URL", "label": "Jira base URL", "kind": "text"},
-    {"name": "jira_token", "env": "JIRA_TOKEN", "label": "Jira token (cá nhân)", "kind": "password"},
+    {"name": "jira_email", "env": "JIRA_EMAIL", "label": "Jira email (chỉ Jira Cloud — để trống nếu Server/DC)", "kind": "text"},
+    {"name": "jira_token", "env": "JIRA_TOKEN", "label": "Jira token (PAT cho Server/DC, API token cho Cloud)", "kind": "password"},
     {"name": "telegram_bot_token", "env": "TELEGRAM_BOT_TOKEN", "label": "Telegram bot token", "kind": "password"},
     {"name": "telegram_chat_id", "env": "TELEGRAM_CHAT_ID", "label": "Telegram chat id", "kind": "text"},
     {"name": "delivery_channel", "env": "DELIVERY_CHANNEL", "label": "Delivery", "kind": "select",
@@ -58,7 +60,9 @@ FORM_FIELDS = [
      "note": "Chỉ lấy MR/issue/ticket có cập nhật trong N ngày gần nhất."},
 ]
 # Kept from the injected environment (not user-editable) so a save never wipes them.
-PRESERVED_ENV = ["LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL", "TIMEZONE"]
+# GitLab keys are preserved too — hidden from the form, but a form save must not drop them.
+PRESERVED_ENV = ["LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL", "TIMEZONE",
+                 "GITLAB_ENABLED", "GITLAB_BASE_URL", "GITLAB_TOKEN"]
 
 
 def _parse_days(expr: str | None) -> set[str]:
@@ -83,7 +87,7 @@ def _defaults() -> dict:
     c = AppConfig()
     return {
         "gitlab_base_url": c.gitlab_base_url, "gitlab_token": c.gitlab_token,
-        "jira_base_url": c.jira_base_url, "jira_token": c.jira_token,
+        "jira_base_url": c.jira_base_url, "jira_email": c.jira_email, "jira_token": c.jira_token,
         "telegram_bot_token": c.telegram_bot_token, "telegram_chat_id": c.telegram_chat_id,
         "delivery_channel": c.delivery_channel,
         "digest_times": c.digest_times or c.default_digest_time, "digest_days": c.digest_days,
@@ -163,10 +167,20 @@ async def _run_once():
     """Build adapters/LLM from the live config and produce one DigestReport."""
     c = AppConfig()
     w = c.fetch_window_days
+    # Diagnostic: presence/length of the Jira config at run time (values never logged).
+    # If jira_token_present is False here, the adapter below is None and Jira is silently skipped.
+    logger.info("UI _run_once: jira_base_present=%s jira_token_present=%s jira_token_len=%d "
+                "gitlab_enabled=%s",
+                bool(c.jira_base_url), bool((c.jira_token or '').strip()),
+                len(c.jira_token or ''), c.gitlab_enabled)
     gl = (GitLabAdapter(c.gitlab_base_url, c.gitlab_token, window_days=w)
-          if c.gitlab_base_url and c.gitlab_token else None)
-    jr = (JiraAdapter(c.jira_base_url, c.jira_token, window_days=w)
+          if c.gitlab_enabled and c.gitlab_base_url and c.gitlab_token else None)
+    jr = (JiraAdapter(c.jira_base_url, c.jira_token, email=c.jira_email, window_days=w)
           if c.jira_base_url and c.jira_token else None)
+    if jr is None:
+        logger.warning("Jira adapter NOT created (base or token empty) — digest will have no "
+                       "Jira items. base_present=%s token_present=%s",
+                       bool(c.jira_base_url), bool((c.jira_token or '').strip()))
     llm = AsyncOpenAI(base_url=c.llm_base_url or None, api_key=c.llm_api_key or "not-needed")
     report = await build_digest(gitlab=gl, jira=jr, user_name="me", llm=llm, model=c.llm_model,
                                 now=datetime.now(_tz.utc), stale_after=c.stale_after_days,
@@ -240,8 +254,9 @@ async def schedule(request: Request) -> str:
         llm=llm, model=c.llm_model, gitlab_base=c.gitlab_base_url, jira_base=c.jira_base_url,
         report_dir=c.report_dir,
         make_gitlab=lambda u, t: GitLabAdapter(u, t, window_days=c.fetch_window_days),
-        make_jira=lambda u, t: JiraAdapter(u, t, window_days=c.fetch_window_days),
-        make_delivery=lambda o: _SchedDelivery(c, o), stale_after=c.stale_after_days)
+        make_jira=lambda u, t, email: JiraAdapter(u, t, email=email, window_days=c.fetch_window_days),
+        make_delivery=lambda o: _SchedDelivery(c, o), stale_after=c.stale_after_days,
+        gitlab_enabled=c.gitlab_enabled)
     if _scheduler is not None:
         _scheduler.shutdown()
     _scheduler = AgentScheduler(owner=owner, service=service, timezone=c.timezone)

@@ -15,16 +15,25 @@ class DigestService:
     def __init__(self, *, llm: Any, model: str,
                  gitlab_base: str, jira_base: str, report_dir: str,
                  make_gitlab: Callable, make_jira: Callable, make_delivery: Callable,
-                 stale_after: int = 7) -> None:
+                 stale_after: int = 7, gitlab_enabled: bool = True) -> None:
         self._llm = llm; self._model = model
         self._gl_base = gitlab_base; self._jr_base = jira_base; self._report_dir = report_dir
         self._make_gitlab = make_gitlab; self._make_jira = make_jira; self._make_delivery = make_delivery
         self._stale_after = stale_after
+        self._gitlab_enabled = gitlab_enabled
         self._store = StateStore(report_dir)
 
     async def run_for(self, owner: Owner, *, now: datetime) -> None:
-        gitlab = self._make_gitlab(self._gl_base, owner.gitlab_token) if owner.gitlab_token else None
-        jira = self._make_jira(self._jr_base, owner.jira_token) if owner.jira_token else None
+        if self._gitlab_enabled:
+            gitlab = self._make_gitlab(self._gl_base, owner.gitlab_token) if owner.gitlab_token else None
+        else:
+            logger.info("GitLab disabled (GITLAB_ENABLED=false) — skipping GitLab fetch")
+            gitlab = None
+        # Diagnostic: presence/length only (token value never logged).
+        logger.info("run_for: jira_base_present=%s jira_token_present=%s jira_token_len=%d jira_email_present=%s",
+                    bool(self._jr_base), bool((owner.jira_token or '').strip()),
+                    len(owner.jira_token or ''), bool((owner.jira_email or '').strip()))
+        jira = self._make_jira(self._jr_base, owner.jira_token, owner.jira_email) if owner.jira_token else None
         report = await build_digest(gitlab=gitlab, jira=jira, user_name=owner.display_name,
                                     llm=self._llm, model=self._model, now=now,
                                     stale_after=self._stale_after, store=self._store)

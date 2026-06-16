@@ -1,7 +1,5 @@
-<<<<<<< HEAD
 .agentbase/
 .env
-=======
 __pycache__/
 *.py[cod]
 .env
@@ -14,4 +12,4 @@ venv/
 *.egg-info/
 dist/
 build/
->>>>>>> 506f9c127b47c5666cd11e54a80ffc6e9124eb89
+.claude/

@@ -30,7 +30,7 @@ STATUS_LABEL = {
     SignalType.MR_MINE_APPROVED: "Đã approve · sẵn sàng merge",
     SignalType.ISSUE_ASSIGNED_DUE: "Issue tới hạn",
     SignalType.JIRA_OVERDUE: "Quá hạn",
-    SignalType.JIRA_NEW_DUE_SOON: "NEW · sắp tới hạn, cần bắt đầu",
+    SignalType.JIRA_DUE_SOON: "Sắp tới hạn, cần xử lý",
     SignalType.JIRA_CS_SLA_DUE_SOON: "🚨 SLA gấp (≤1 ngày)",
     SignalType.JIRA_IN_PROGRESS: "Đang làm",
     SignalType.JIRA_OTHER: "Chưa bắt đầu",

@@ -20,15 +20,12 @@
 #                        summarizes a CS ticket from its description.
 #   comment_limit      — For non-CS tickets, the digest gathers the N most recent comments
 #                        (with author names) as context.
-#   sandbox_alert_days — A non-CS ticket still in status NEW with ≤ N days until its sandbox
-#                        date is treated as an alert: pushed into the 🔴 action group
-#                        (start it soon) instead of FYI.
+#   duedate_alert_days — A non-CS ticket with ≤ N days until its `duedate` is treated as an
+#                        alert: pushed into the 🔴 action group (handle it soon) instead of
+#                        FYI. Applies to every non-CS ticket regardless of status.
 #   sla_alert_days     — For CS tickets, an SLA Date within ≤ N days (default 1, including
 #                        already overdue) is flagged 🚨 urgent SLA. SLA Date is also the sort
 #                        key for CS tickets (soonest first).
-#   sandbox_date_field — Jira custom field ID holding the sandbox date of non-CS tickets
-#                        (e.g. customfield_10234). Used instead of `duedate` for sorting and
-#                        alerts. Leave empty ("") to fall back to `duedate`.
 #   sla_date_field     — Jira custom field ID holding the SLA Date of CS tickets
 #                        (e.g. customfield_10235). Used for sorting and the SLA flag. Leave
 #                        empty ("") to fall back to `duedate`.
@@ -39,11 +36,10 @@
 #                        consumed by another pattern. Each match is replaced with [LABEL].
 
 skip_statuses: []        # status names to skip (case-insensitive); empty = skip none
-cs_projects: [ISSUE]     # tickets in these project keys are CS -> highest priority
+cs_projects: [IS]        # tickets in these project keys are CS -> highest priority (e.g. IS-2)
 comment_limit: 3         # number of recent comments gathered for non-CS tickets
-sandbox_alert_days: 2    # non-CS NEW ticket with ≤ N days until sandbox date -> alert (action)
+duedate_alert_days: 2    # non-CS ticket with ≤ N days until duedate -> alert (action)
 sla_alert_days: 1        # CS ticket with SLA Date ≤ N days away -> alert 🚨 urgent SLA (action)
-sandbox_date_field: ""   # Jira custom field ID for the non-CS sandbox date (e.g. customfield_10234)
 sla_date_field: ""       # Jira custom field ID for the CS SLA date (e.g. customfield_10235)
 pii:                     # redacted in the order below, each match replaced with [LABEL]
   EMAIL:   '[\w.+-]+@[\w.-]+\.\w+'

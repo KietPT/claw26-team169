@@ -18,11 +18,10 @@ DEFAULT_PATH = Path(__file__).resolve().parent.parent / "rules" / "jira-digest.y
 # Used when the file cannot be read — must match the committed rules/jira-digest.yaml.
 _DEFAULTS = {
     "skip_statuses": [],
-    "cs_projects": ["ISSUE"],
+    "cs_projects": ["IS"],
     "comment_limit": 3,
-    "sandbox_alert_days": 2,
+    "duedate_alert_days": 2,
     "sla_alert_days": 1,
-    "sandbox_date_field": "",
     "sla_date_field": "",
     "pii": {  # order matters: long/specific numbers (CCCD) first, then PHONE, then ACCOUNT
         "EMAIL": r"[\w.+-]+@[\w.-]+\.\w+",
@@ -37,9 +36,8 @@ class RuleSet:
     skip_statuses: frozenset[str]                 # lowercased status names
     cs_projects: frozenset[str]                   # project keys treated as CS
     comment_limit: int
-    sandbox_alert_days: int = 2                       # non-CS NEW + ≤N days until sandbox_date → alert
+    duedate_alert_days: int = 2                   # non-CS ticket ≤N days until duedate → JIRA_DUE_SOON
     sla_alert_days: int = 1                       # CS: SLA Date within N days → JIRA_CS_SLA_DUE_SOON
-    sandbox_date_field: str = ""                  # Jira custom field ID for sandbox date (non-CS)
     sla_date_field: str = ""                      # Jira custom field ID for SLA date (CS)
     pii: tuple[tuple[str, re.Pattern], ...] = ()  # ordered (label, compiled regex)
 
@@ -52,9 +50,8 @@ def _build(data: dict) -> RuleSet:
         skip_statuses=frozenset(s.lower() for s in (data.get("skip_statuses") or [])),
         cs_projects=frozenset(data.get("cs_projects") or []),
         comment_limit=int(data.get("comment_limit", 3)),
-        sandbox_alert_days=int(data.get("sandbox_alert_days", 2)),
+        duedate_alert_days=int(data.get("duedate_alert_days", 2)),
         sla_alert_days=int(data.get("sla_alert_days", 1)),
-        sandbox_date_field=str(data.get("sandbox_date_field") or ""),
         sla_date_field=str(data.get("sla_date_field") or ""),
         pii=pii,
     )
