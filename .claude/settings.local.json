@@ -1,0 +1,12 @@
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://maas-llm-aiplatform-hcm.api.vngcloud.vn",
+    "ANTHROPIC_AUTH_TOKEN": "vn-hBk-HE9A96-Ei75Qng6cP-Pa5-J5_t737d1ce5d46241e48e65f3528ac8eb5fC5h9gJd-G4oZThnT0uQn02FC-FnttMe",
+    "ANTHROPIC_API_KEY": "",
+    "ANTHROPIC_MODEL": "minimax/minimax-m2.5",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-6",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-8",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-4-5-20251001",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "claude-sonnet-4-6"
+  }
+}

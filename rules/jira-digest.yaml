@@ -1,0 +1,52 @@
+# Jira Digest Rules — source of truth for how the daily digest treats Jira tickets.
+#
+# The code reads this file at runtime (digest/ruledefs.py), so editing the values
+# below changes behavior with no code change and no redeploy. Point at a different
+# file via the RULES_FILE env var. If this file is missing or invalid, the code
+# falls back to built-in defaults so the digest never breaks.
+#
+# These are declarative *values* only. The *logic* that uses them ("pinned tickets
+# first", "skip listed statuses", "redact before sending to the LLM") lives in code
+# and is shared; only the values (which statuses, which projects, which regexes) come
+# from here.
+#
+# Rules:
+#   skip_statuses      — Tickets whose status.name is in this list are dropped from the
+#                        digest. Empty ([]) skips nothing — every active-sprint ticket
+#                        shows, including "New".
+#   cs_projects        — Tickets whose project key (the part before "-", e.g. ISSUE-1234
+#                        -> ISSUE) is in this list are treated as CS tickets: always in the
+#                        🔴 action group and sorted first (highest priority). The digest
+#                        summarizes a CS ticket from its description.
+#   comment_limit      — For non-CS tickets, the digest gathers the N most recent comments
+#                        (with author names) as context.
+#   sandbox_alert_days — A non-CS ticket still in status NEW with ≤ N days until its sandbox
+#                        date is treated as an alert: pushed into the 🔴 action group
+#                        (start it soon) instead of FYI.
+#   sla_alert_days     — For CS tickets, an SLA Date within ≤ N days (default 1, including
+#                        already overdue) is flagged 🚨 urgent SLA. SLA Date is also the sort
+#                        key for CS tickets (soonest first).
+#   sandbox_date_field — Jira custom field ID holding the sandbox date of non-CS tickets
+#                        (e.g. customfield_10234). Used instead of `duedate` for sorting and
+#                        alerts. Leave empty ("") to fall back to `duedate`.
+#   sla_date_field     — Jira custom field ID holding the SLA Date of CS tickets
+#                        (e.g. customfield_10235). Used for sorting and the SLA flag. Leave
+#                        empty ("") to fall back to `duedate`.
+#   pii                — Map of LABEL -> regex. All Jira text (CS descriptions + comments) is
+#                        redacted before it is sent to the LLM and before display, so PII
+#                        never leaves the machine. Patterns are applied in declaration order
+#                        (EMAIL, then CCCD, PHONE, ACCOUNT) so longer numbers are not partly
+#                        consumed by another pattern. Each match is replaced with [LABEL].
+
+skip_statuses: []        # status names to skip (case-insensitive); empty = skip none
+cs_projects: [ISSUE]     # tickets in these project keys are CS -> highest priority
+comment_limit: 3         # number of recent comments gathered for non-CS tickets
+sandbox_alert_days: 2    # non-CS NEW ticket with ≤ N days until sandbox date -> alert (action)
+sla_alert_days: 1        # CS ticket with SLA Date ≤ N days away -> alert 🚨 urgent SLA (action)
+sandbox_date_field: ""   # Jira custom field ID for the non-CS sandbox date (e.g. customfield_10234)
+sla_date_field: ""       # Jira custom field ID for the CS SLA date (e.g. customfield_10235)
+pii:                     # redacted in the order below, each match replaced with [LABEL]
+  EMAIL:   '[\w.+-]+@[\w.-]+\.\w+'
+  CCCD:    '\b\d{9}\b|\b\d{12}\b'
+  PHONE:   '(?:\+84|0)\d{8,10}'
+  ACCOUNT: '\b\d{10,19}\b'
