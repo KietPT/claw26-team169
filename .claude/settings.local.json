@@ -4,7 +4,10 @@
       "Bash(uv run *)",
       "Bash(.venv/bin/python -m pytest tests/test_jira.py -k \"endpoint\" -q)",
       "Bash(.venv/bin/python -m pip install -q -e \".[dev]\")",
-      "Bash(.venv/bin/python -m pytest --version)"
+      "Bash(.venv/bin/python -m pytest --version)",
+      "Bash(.venv/bin/python -m pytest -q)",
+      "Bash(command -v python3 pytest)",
+      "Bash(python3 -m pytest tests/test_jira.py tests/test_webui.py -q)"
     ]
   }
 }

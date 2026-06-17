@@ -153,6 +153,39 @@ async def test_task_type_still_shown():
     assert any(i.id == "jira:DEV-7" for i in items)   # Task type (trong sprint) vẫn hiển thị
 
 
+async def test_combines_cs_and_task_cs_first():
+    """Both JQLs are fetched concurrently and merged with CS results before task results.
+    Guards the parallel (asyncio.gather) fetch against reordering the combined items."""
+    cs = [{"key": "IS-1", "fields": {"summary": "cs", "duedate": None,
+        "status": {"name": "In Progress", "statusCategory": {"key": "indeterminate"}},
+        "description": "d"}}]
+    task = [{"key": "DEV-1", "fields": {"summary": "task", "duedate": None,
+        "status": {"name": "In Progress", "statusCategory": {"key": "indeterminate"}}}}]
+    seen = []
+    adapter = JiraAdapter("https://j", "tok", transport=_split(cs=cs, sprint=task, seen=seen))
+    items = await adapter.fetch_items(today=date(2026, 6, 15))
+    assert [i.id for i in items] == ["jira:IS-1", "jira:DEV-1"]   # CS first, then task
+    assert len(seen) == 2                                          # both JQLs dispatched
+
+
+def test_priority_in_fields():
+    adapter = JiraAdapter("https://j", "tok", transport=_split())
+    assert "priority" in adapter._fields()
+
+
+async def test_build_item_maps_priority():
+    withp = {"key": "DEV-20", "fields": {"summary": "Has priority", "duedate": None,
+        "status": {"name": "In Progress", "statusCategory": {"key": "indeterminate"}},
+        "priority": {"name": "High"}}}
+    without = {"key": "DEV-21", "fields": {"summary": "No priority", "duedate": None,
+        "status": {"name": "In Progress", "statusCategory": {"key": "indeterminate"}}}}
+    adapter = JiraAdapter("https://j", "tok", transport=_split(sprint=[withp, without]))
+    items = await adapter.fetch_items(today=date(2026, 6, 15))
+    by_key = {i.id: i for i in items}
+    assert by_key["jira:DEV-20"].priority == "High"
+    assert by_key["jira:DEV-21"].priority is None
+
+
 def _rs(**kwargs) -> RuleSet:
     """Build a minimal RuleSet with overrides for testing duedate-based rules."""
     base = dict(skip_statuses=frozenset(), cs_projects=frozenset(["ISSUE"]),

@@ -3,9 +3,9 @@ from datetime import date
 from digest.models import DigestItem, Category, SignalType
 from digest import rules
 
-def mk(signal, id="x", due=None):
+def mk(signal, id="x", due=None, priority=None):
     return DigestItem(id=id, signal=signal, title="t", detail="d", url="u",
-                      source="gitlab", due=due)
+                      source="gitlab", due=due, priority=priority)
 
 def test_category_mapping():
     assert rules.categorize(mk(SignalType.MR_NEEDS_MY_REVIEW)) is Category.ACTION
@@ -22,13 +22,36 @@ def test_group_and_cap_overflow():
     assert len(report.action) == 10
     assert report.more["action"] == 2
 
-def test_pinned_forces_action_and_sorts_first():
+def test_pinned_forces_action_but_does_not_sort_first():
+    # Pinned still forces ACTION category, but importance_key sorts the overdue
+    # (deadline group 0) above the non-deadline pinned item (deadline group 1).
     pinned = mk(SignalType.JIRA_OTHER, id="cs", due=None)   # signal would be FYI
     pinned.pinned = True
     overdue = mk(SignalType.JIRA_OVERDUE, id="od", due=date(2026, 6, 1))
     report = rules.build_report([overdue, pinned], date="2026-06-15", user_name="T")
     assert pinned.category is Category.ACTION                # forced into ACTION
-    assert [i.id for i in report.action] == ["cs", "od"]      # pinned above overdue
+    assert [i.id for i in report.action] == ["od", "cs"]     # deadline-first, not pinned-first
+
+def test_overdue_medium_sorts_above_non_deadline_highest():
+    # Deadline group wins over priority: an overdue Medium beats a non-deadline Highest.
+    overdue_med = mk(SignalType.JIRA_OVERDUE, id="od", due=date(2026, 6, 1), priority="Medium")
+    # Non-deadline Highest, forced into ACTION via pinned so both share the action bucket.
+    highest = mk(SignalType.JIRA_IN_PROGRESS, id="hi", priority="Highest")
+    highest.pinned = True
+    report = rules.build_report([highest, overdue_med], date="2026-06-15", user_name="T")
+    assert [i.id for i in report.action] == ["od", "hi"]
+
+def test_within_overdue_group_high_before_medium():
+    high = mk(SignalType.JIRA_OVERDUE, id="hi", due=date(2026, 6, 10), priority="High")
+    med = mk(SignalType.JIRA_OVERDUE, id="md", due=date(2026, 6, 10), priority="Medium")
+    report = rules.build_report([med, high], date="2026-06-15", user_name="T")
+    assert [i.id for i in report.action] == ["hi", "md"]
+
+def test_same_group_and_priority_earlier_due_first():
+    early = mk(SignalType.JIRA_OVERDUE, id="early", due=date(2026, 6, 1), priority="High")
+    late = mk(SignalType.JIRA_OVERDUE, id="late", due=date(2026, 6, 10), priority="High")
+    report = rules.build_report([late, early], date="2026-06-15", user_name="T")
+    assert [i.id for i in report.action] == ["early", "late"]
 
 def test_overdue_sorted_first():
     older = mk(SignalType.JIRA_OVERDUE, id="old", due=date(2026, 6, 10))

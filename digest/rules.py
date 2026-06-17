@@ -28,6 +28,22 @@ def is_at_risk(item: DigestItem) -> bool:
     """Deterministic 'could be late' flag: a deadline signal, or gone stale."""
     return item.signal in RISK_SIGNALS or item.stale
 
+# Importance ranking inputs (spec: deadline group → priority → due → id).
+PRIORITY_RANK = {"Highest": 0, "High": 1, "Medium": 2, "Low": 3, "Lowest": 4}
+DEADLINE_SIGNALS = {SignalType.JIRA_OVERDUE, SignalType.JIRA_CS_SLA_DUE_SOON,
+                    SignalType.JIRA_DUE_SOON, SignalType.ISSUE_ASSIGNED_DUE}
+
+def priority_rank(item: DigestItem) -> int:
+    return PRIORITY_RANK.get(item.priority or "", 2)   # unknown/None -> Medium
+
+def deadline_group(item: DigestItem) -> int:
+    return 0 if item.signal in DEADLINE_SIGNALS else 1
+
+def importance_key(item: DigestItem):
+    from datetime import date as _d
+    return (deadline_group(item), priority_rank(item),
+            item.due or _d.max, item.id)
+
 def annotate_stale(item: DigestItem, today: _date, stale_after: int) -> None:
     """Compute idle_days/stale from the source's last-update date (no-op if unknown)."""
     if item.updated is None:
@@ -46,11 +62,6 @@ def categorize(item: DigestItem) -> Category:
         return Category.ACTION
     return base
 
-def _sort_key(item: DigestItem) -> tuple:
-    # pinned sorts first absolutely; then earlier due dates; no due date goes last
-    pin = 0 if item.pinned else 1
-    return (pin, 0, item.due) if item.due else (pin, 1, _date.max)
-
 def build_report(items: list[DigestItem], *, date: str, user_name: str, cap: int = 10,
                  stale_after: int = 7) -> DigestReport:
     try:
@@ -64,7 +75,7 @@ def build_report(items: list[DigestItem], *, date: str, user_name: str, cap: int
         buckets[it.category].append(it)
     report = DigestReport(date=date, user_name=user_name)
     for cat, target in ((Category.ACTION, "action"), (Category.WAITING, "waiting"), (Category.FYI, "fyi")):
-        ordered = sorted(buckets[cat], key=_sort_key)
+        ordered = sorted(buckets[cat], key=importance_key)
         if len(ordered) > cap:
             report.more[cat.value] = len(ordered) - cap
         setattr(report, target, ordered[:cap])

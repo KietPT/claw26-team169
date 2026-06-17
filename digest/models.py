@@ -41,6 +41,7 @@ class DigestItem:
     stale: bool = False     # idle_days >= STALE_AFTER_DAYS (computed in rules)
     is_new: bool = False    # not present in the previous run's snapshot (computed in snapshot)
     pinned: bool = False    # always ACTION + sorted first (e.g. CS tickets highest priority)
+    priority: str | None = None  # raw Jira priority name (e.g. "High"); None for GitLab/MR
     subtasks: list[str] = field(default_factory=list)  # "KEY: summary" — subtasks assigned to me
 
 @dataclass
@@ -51,8 +52,8 @@ class DigestReport:
     waiting: list[DigestItem] = field(default_factory=list)
     fyi: list[DigestItem] = field(default_factory=list)
     headline: str = ""
-    summary: str = ""                                   # LLM 2-3 sentence synthesis of the day
-    focus: list[dict] = field(default_factory=list)     # {title,url,reason} — tackle next to avoid slipping
+    summary: str = ""                                   # 2-3 sentence synthesized paragraph (rendered above the ranked list)
+    priorities: list[dict] = field(default_factory=list)  # {title,url,priority,reason} — ranked top important items
     more: dict[str, int] = field(default_factory=dict)  # category.value -> overflow count
     errors: list[str] = field(default_factory=list)     # e.g. "Jira: token expired"
     resolved: list[dict] = field(default_factory=list)  # {title,url} done since the previous run

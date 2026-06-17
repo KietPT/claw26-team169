@@ -8,10 +8,12 @@ def _cs(it):
 def test_render_has_header_and_links():
     it = mk_item(SignalType.MR_NEEDS_MY_REVIEW, url="https://g/mr/1", title="MR !1")
     it.category = Category.ACTION
-    r = DigestReport(date="2026-06-15", user_name="T", headline="Focus", action=[it])
+    r = DigestReport(date="2026-06-15", user_name="T", headline="Focus",
+                     summary="Hôm nay có 2 việc gấp cần ưu tiên.", action=[it])
     msgs = render_messages(r)
     blob = "\n".join(msgs)
     assert "Focus" in blob
+    assert "Hôm nay có 2 việc gấp cần ưu tiên." in msgs[0]   # synthesized summary in overview
     assert "Merge Request" in blob              # section label
     assert '<a href="https://g/mr/1">' in blob
 
@@ -42,6 +44,21 @@ def test_long_section_still_chunked_under_limit():
     msgs = render_messages(r)
     assert len(msgs) > 1
     assert all(len(m) <= TELEGRAM_LIMIT for m in msgs)
+
+def test_priority_badge_and_ranked_list_rendered():
+    it = mk_item(SignalType.JIRA_OVERDUE, id="jira:DEV-1", title="DEV-1",
+                 url="https://j/DEV-1", source="jira")
+    it.category = Category.ACTION
+    it.priority = "High"
+    r = DigestReport(date="2026-06-15", user_name="T", action=[it],
+                     priorities=[{"title": "DEV-1", "url": "https://j/DEV-1",
+                                  "priority": "High", "reason": "Quá hạn"}])
+    msgs = render_messages(r)
+    blob = "\n".join(msgs)
+    assert "High" in blob                              # priority badge on the item
+    assert "Quan trọng nhất hôm nay" in msgs[0]         # ranked list in overview message
+    assert "1. " in msgs[0] and "Quá hạn" in msgs[0]
+    assert "Báo cáo" not in msgs[1]                     # section message separate
 
 def test_render_subtasks_listed():
     it = mk_item(SignalType.JIRA_IN_PROGRESS, url="https://j/STORY-1", title="STORY-1", source="jira")

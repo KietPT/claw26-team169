@@ -4,6 +4,7 @@ Rule values (skip statuses, CS projects, PII redaction) come from rules/jira-dig
 via digest.ruledefs — edit that file to change behavior without touching code.
 """
 from __future__ import annotations
+import asyncio
 import base64
 import logging
 from datetime import date
@@ -52,7 +53,7 @@ class JiraAdapter:
                                          timeout=20, transport=transport)
 
     def _fields(self) -> str:
-        base = "summary,duedate,status,description,comment,issuetype,parent,updated"
+        base = "summary,duedate,status,description,comment,issuetype,parent,updated,priority"
         extra = [f for f in [self._rules.sla_date_field] if f]
         return ",".join([base] + extra) if extra else base
 
@@ -101,9 +102,10 @@ class JiraAdapter:
         today = today or date.today()
         rs = self._rules
         try:
-            issues: list[dict] = []
-            for jql in self._jqls():
-                issues += await self._search(jql)
+            # The CS and task JQLs are independent → fetch them concurrently. gather preserves
+            # input order, so the combined list stays CS-first, task-second (same as before).
+            batches = await asyncio.gather(*(self._search(jql) for jql in self._jqls()))
+            issues: list[dict] = [iss for batch in batches for iss in batch]
 
             # Partition: non-CS subtasks grouped by parent; everything else stands alone.
             subtasks_by_parent: dict[str, list[dict]] = {}
@@ -170,7 +172,8 @@ class JiraAdapter:
         detail = ruledefs.redact(raw, rs) or f.get("summary", "")
         return DigestItem(id=f"jira:{key}", signal=signal, title=key, detail=detail,
                           url=f"{self._base}/browse/{key}", source="jira", due=due,
-                          updated=_date10(f.get("updated")), pinned=cs)
+                          updated=_date10(f.get("updated")), pinned=cs,
+                          priority=(f.get("priority") or {}).get("name"))
 
 def _comments(fields: dict, limit: int) -> str:
     """Collect the `limit` most recent comments with author name: 'Name: body'."""

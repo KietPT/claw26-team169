@@ -2,7 +2,8 @@
 from __future__ import annotations
 import html as _html
 from digest.models import DigestItem, DigestReport
-from digest.grouping import by_section, CATEGORY_EMOJI, SECTIONS, status_label, due_label, stale_label
+from digest.grouping import (by_section, CATEGORY_EMOJI, SECTIONS, status_label,
+                             due_label, stale_label, priority_label, PRIORITY_LABEL)
 
 _SECTION_META = {sec: (label, icon) for sec, label, icon in SECTIONS}
 
@@ -18,6 +19,9 @@ def _block(it: DigestItem, report_date: str) -> str:
     lines = [head]
 
     meta = []
+    prio = priority_label(it)
+    if prio:
+        meta.append(_esc(prio))
     stale = stale_label(it)
     if stale:
         meta.append(_esc(stale))
@@ -67,7 +71,7 @@ def _pack(segments: list[str], limit: int) -> list[str]:
     return chunks
 
 def render_messages(report: DigestReport, *, limit: int = TELEGRAM_LIMIT) -> list[str]:
-    """The overview (date + headline + summary + focus) is its own message; each section
+    """The overview (date + headline + ranked priorities) is its own message; each section
     (CS Ticket / Task / Merge Request) is a separate message (chunked if too long);
     resolved + errors (if any) become trailing messages."""
     header = [f"<b>Báo cáo {report.date}</b>"]
@@ -75,12 +79,17 @@ def render_messages(report: DigestReport, *, limit: int = TELEGRAM_LIMIT) -> lis
         header.append(f"🎯 {_esc(report.headline)}")
     if report.summary:
         header.append(_esc(report.summary))
-    if report.focus:
-        header.append("⏰ <b>Ưu tiên kế tiếp (tránh trễ):</b>")
-        header += [f'- <a href="{_esc(f.get("url",""))}">{_esc(f.get("title",""))}</a>'
-                   + (f': {_esc(f["reason"])}' if f.get("reason") else "")
-                   for f in report.focus]
-    messages: list[str] = _pack(header, limit)   # overview (summary/focus) as its own message
+    if report.priorities:
+        header.append("🔝 <b>Quan trọng nhất hôm nay:</b>")
+        for n, p in enumerate(report.priorities, 1):
+            line = f'{n}. <a href="{_esc(p.get("url",""))}">{_esc(p.get("title",""))}</a>'
+            badge = PRIORITY_LABEL.get(p.get("priority") or "")
+            if badge:
+                line += f" [{_esc(badge)}]"
+            if p.get("reason"):
+                line += f': {_esc(p["reason"])}'
+            header.append(line)
+    messages: list[str] = _pack(header, limit)   # overview (headline + priorities) as its own message
     for sec, items in by_section(report).items():
         label, icon = _SECTION_META[sec]
         segs = [f"{icon} <b>{_esc(label)}</b>"] + [_block(i, report.date) for i in items]

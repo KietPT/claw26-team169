@@ -39,6 +39,13 @@ STATUS_LABEL = {
 def status_label(item: DigestItem) -> str:
     return STATUS_LABEL.get(item.signal, "")
 
+# Jira priority badge. Medium / unknown / None → hidden (no badge).
+PRIORITY_LABEL = {"Highest": "🔺🔺 Highest", "High": "🔺 High",
+                  "Low": "🔻 Low", "Lowest": "🔻🔻 Lowest"}
+
+def priority_label(item: DigestItem) -> str | None:
+    return PRIORITY_LABEL.get(item.priority or "")
+
 def stale_label(item: DigestItem) -> str | None:
     """'💤 N ngày không cập nhật' khi item bị đánh dấu stale."""
     if item.stale and item.idle_days is not None:
