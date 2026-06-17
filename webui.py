@@ -45,8 +45,9 @@ DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 FORM_FIELDS = [
     # GitLab fields are hidden: GitLab is disabled by default (private-network only).
     # To re-enable, set GITLAB_ENABLED=true and GITLAB_BASE_URL/GITLAB_TOKEN in the .env directly.
-    # Jira base URL, Digest days, and Fetch window are hidden too (kept simple) — they come from
+    # Jira base URL and Fetch window are hidden too (kept simple) — they come from
     # the environment/defaults and are preserved on save via PRESERVED_ENV below.
+    # Digest days IS editable (the day-of-week checkboxes), defaulting to mon-fri.
     {"name": "jira_email", "env": "JIRA_EMAIL", "label": "Jira email", "kind": "text", "no_autofill": True, "required": True},
     {"name": "jira_token", "env": "JIRA_TOKEN", "label": "Jira token", "kind": "password", "no_autofill": True, "required": True,
      "help": [
@@ -70,13 +71,14 @@ FORM_FIELDS = [
     {"name": "delivery_channel", "env": "DELIVERY_CHANNEL", "label": "Delivery", "kind": "select",
      "options": ["telegram", "html", "both"]},
     {"name": "digest_times", "env": "DIGEST_TIMES", "label": "Digest times (CSV HH:MM)", "kind": "text"},
+    {"name": "digest_days", "env": "DIGEST_DAYS", "label": "Digest days (ngày chạy)", "kind": "days"},
 ]
 # Kept from the injected environment (not user-editable) so a save never wipes them.
 # GitLab keys are preserved too — hidden from the form, but a form save must not drop them.
-# JIRA_BASE_URL / DIGEST_DAYS / FETCH_WINDOW_DAYS / STALE_AFTER_DAYS are hidden but preserved here.
+# JIRA_BASE_URL / FETCH_WINDOW_DAYS / STALE_AFTER_DAYS are hidden but preserved here.
 PRESERVED_ENV = ["LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL", "TIMEZONE",
                  "GITLAB_ENABLED", "GITLAB_BASE_URL", "GITLAB_TOKEN",
-                 "JIRA_BASE_URL", "DIGEST_DAYS", "FETCH_WINDOW_DAYS", "STALE_AFTER_DAYS"]
+                 "JIRA_BASE_URL", "FETCH_WINDOW_DAYS", "STALE_AFTER_DAYS"]
 
 
 def _parse_days(expr: str | None) -> set[str]:

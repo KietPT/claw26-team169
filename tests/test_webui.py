@@ -12,9 +12,10 @@ def test_index_widgets_and_no_llm_fields():
     assert 'name="jira_token"' in r.text
     assert 'name="gitlab_token"' not in r.text                         # GitLab hidden (private-network only)
     assert '<select name="delivery_channel"' in r.text                 # delivery = dropdown
-    # hidden for simplicity: Jira base URL, Digest days, Fetch window, Stale after
+    assert 'name="digest_days"' in r.text and '<div class="days"' in r.text   # day-of-week checkboxes
+    # hidden for simplicity: Jira base URL, Fetch window, Stale after
     assert 'name="jira_base_url"' not in r.text
-    assert 'name="digest_days"' not in r.text and 'name="fetch_window_days"' not in r.text
+    assert 'name="fetch_window_days"' not in r.text
     assert 'name="stale_after_days"' not in r.text
     assert 'name="llm_api_key"' not in r.text and 'name="timezone"' not in r.text
 
@@ -51,6 +52,16 @@ def test_required_fields_marked_and_guard_present():
     assert "b.disabled=!ok" in r.text                             # button-guard script present
 
 
+def test_digest_days_default_checks_mon_to_fri(monkeypatch):
+    # With no DIGEST_DAYS in env, the day checkboxes default to mon–fri (weekends unchecked).
+    monkeypatch.delenv("DIGEST_DAYS", raising=False)
+    r = client.get("/")
+    import re
+    checked = re.findall(r'value="(\w+)" checked', r.text)
+    assert checked == ["mon", "tue", "wed", "thu", "fri"]
+    assert "sat" not in checked and "sun" not in checked
+
+
 def test_parse_days():
     assert webui._parse_days("mon-fri") == {"mon", "tue", "wed", "thu", "fri"}
     assert webui._parse_days("mon,wed") == {"mon", "wed"}
@@ -72,14 +83,14 @@ def test_save_env_writes_fields_and_preserves_llm(tmp_path, monkeypatch):
     monkeypatch.setenv("GITLAB_ENABLED", "false")        # hidden from form, must survive a save
     monkeypatch.setenv("GITLAB_TOKEN", "glpat-keep")
     monkeypatch.setenv("JIRA_BASE_URL", "https://j")     # hidden from form, preserved from env
-    monkeypatch.setenv("DIGEST_DAYS", "mon,wed")
     monkeypatch.setenv("STALE_AFTER_DAYS", "5")
     p = tmp_path / ".env"
-    webui._save_env({"digest_times": "08:30"}, str(p))
+    webui._save_env({"digest_times": "08:30", "digest_days": "mon,wed"}, str(p))
     text = p.read_text()
     assert "DIGEST_TIMES=08:30" in text
+    assert "DIGEST_DAYS=mon,wed" in text                                       # editable, saved from form
     assert "STALE_AFTER_DAYS=5" in text                                        # hidden, preserved
-    assert "JIRA_BASE_URL=https://j" in text and "DIGEST_DAYS=mon,wed" in text  # hidden, preserved
+    assert "JIRA_BASE_URL=https://j" in text                                   # hidden, preserved
     assert "LLM_MODEL=gpt-x" in text and "TIMEZONE=Asia/Ho_Chi_Minh" in text  # preserved
     assert "GITLAB_ENABLED=false" in text and "GITLAB_TOKEN=glpat-keep" in text  # GitLab preserved, not wiped
 
