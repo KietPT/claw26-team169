@@ -1,4 +1,4 @@
-# Dev Daily Digest
+# Personal Daily Digest
 
 > Một **personal agent** giúp bạn không bỏ lỡ ticket Jira quan trọng: vào đúng thời điểm
 > bạn chọn trong ngày, agent gom các ticket bạn đang theo dõi, tóm tắt ngắn ngữ cảnh, cảnh

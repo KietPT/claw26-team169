@@ -148,7 +148,7 @@ wheels = [
 ]
 
 [[package]]
-name = "dev-daily-digest"
+name = "personal-daily-digest"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

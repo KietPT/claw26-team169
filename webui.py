@@ -29,7 +29,7 @@ from digest.snapshot import StateStore
 from scheduler import AgentScheduler, DigestService
 
 logger = logging.getLogger(__name__)
-app = FastAPI(title="Dev Daily Digest")
+app = FastAPI(title="Personal Daily Digest")
 
 # Health endpoint for AgentBase Runtime
 @app.get("/health")
@@ -255,7 +255,7 @@ def render_form(values: dict, *, message: str = "") -> str:
         f'<div class="fld"><label><span class="lbl">{_label(f)}</span>'
         f'{_widget(f, values)}</label>{_help_block(f)}</div>' for f in FORM_FIELDS)
     msg = f'<p class="hl">{_html.escape(message)}</p>' if message else ""
-    return ('<!doctype html><meta charset="utf-8"><title>Dev Daily Digest</title>'
+    return ('<!doctype html><meta charset="utf-8"><title>Personal Daily Digest</title>'
             f"<style>{_FORM_STYLE}</style>"
             '<div class="wrap">'
             '<div class="pagehd"><h1>⚙️ Cấu hình &amp; chạy digest</h1></div>'
